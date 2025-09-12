@@ -26,7 +26,7 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 // Backend URLs: Tries local first, then falls back to the live server
 const LOCAL_IP = Platform.OS === 'android' ? '10.0.2.2' : '192.168.1.107';
 const LOCAL_PORT = '5001';
-const SERVER_URL = 'https://fullbackend-g3e5.onrender.com';
+const SERVER_URL = 'https://goodbackend.onrender.com';
 const LOCAL_URL = `http://${LOCAL_IP}:${LOCAL_PORT}/api/auth`;
 
 /**

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Alert } from
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 
-const BASE_URL = 'https://fullbackend-g3e5.onrender.com';
+const BASE_URL = 'https://goodbackend.onrender.com';
 
 // Mock order data
 const mockOrders = [

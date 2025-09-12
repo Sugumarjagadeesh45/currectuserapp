@@ -15,7 +15,7 @@ interface ProductCardProps {
   addToCart: (product: any) => void;
 }
 
-const BASE_URL = 'https://fullbackend-g3e5.onrender.com';
+const BASE_URL = 'https://goodbackend.onrender.com';
 
 const ProductCard: React.FC<ProductCardProps> = ({ product, addToCart }) => {
   const navigation = useNavigation();

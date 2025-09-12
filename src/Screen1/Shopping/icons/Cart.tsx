@@ -4,7 +4,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import { CartContext } from '../ShoppingContent';
 
-const BASE_URL = 'https://fullbackend-g3e5.onrender.com';
+const BASE_URL = 'https://goodbackend.onrender.com';
 
 const Cart = () => {
   const navigation = useNavigation();

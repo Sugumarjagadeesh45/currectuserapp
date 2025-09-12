@@ -17,7 +17,7 @@ type Product = {
   createdAt: string;
 };
 
-const BASE_URL = 'https://fullbackend-g3e5.onrender.com';
+const BASE_URL = 'https://goodbackend.onrender.com';
 
 const TopSale = () => {
   const navigation = useNavigation();
