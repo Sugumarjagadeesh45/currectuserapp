@@ -8721,17 +8721,17 @@ const TaxiContent: React.FC<TaxiContentProps> = ({
   };
 
   // Add periodic refresh of nearby drivers
-  useEffect(() => {
+useEffect(() => {
     const refreshInterval = setInterval(() => {
       if (location) {
         fetchNearbyDrivers(location.latitude, location.longitude);
       }
-    }, 30000); // Refresh every 30 seconds
+    }, 3000); // Refresh every 30 seconds
 
     return () => clearInterval(refreshInterval);
   }, [location]);
 
-  useEffect(() => {
+useEffect(() => {
     const requestLocation = async () => {
       setIsLoadingLocation(true);
       if (Platform.OS === "android") {
@@ -8776,7 +8776,7 @@ const TaxiContent: React.FC<TaxiContentProps> = ({
     requestLocation();
   }, []);
 
-  useEffect(() => {
+ useEffect(() => {
     const interval = setInterval(() => {
       if (location && (rideStatus === "idle" || rideStatus === "searching")) {
         Geolocation.getCurrentPosition(
@@ -8800,32 +8800,46 @@ const TaxiContent: React.FC<TaxiContentProps> = ({
   }, [rideStatus, isPickupCurrent, dropoffLocation, location]);
 
   // Handle initial nearby drivers response
-  useEffect(() => {
+ useEffect(() => {
     const handleNearbyDriversResponse = (data: { drivers: DriverType[] }) => {
       console.log('Received nearby drivers response:', data);
       if (!location) return;
       
-// In your user app's TaxiContent.tsx
-
-// Update the nearby drivers filtering logic:
-const filteredDrivers = data.drivers
-  .filter(driver => {
-    // Only include drivers with "Live" status
-    if (driver.status && driver.status !== "Live") return false;
-    
-    const distance = calculateDistance(
-      location.latitude,
-      location.longitude,
-      driver.location.coordinates[1], // latitude
-      driver.location.coordinates[0]  // longitude
-    );
-    return distance <= 5; // 5km radius
-  })
-  .sort((a, b) => calculateDistance(location.latitude, location.longitude, a.location.coordinates[1], a.location.coordinates[0]) -
-                   calculateDistance(location.latitude, location.longitude, b.location.coordinates[1], b.location.coordinates[0]))
-  .slice(0, 10); // Limit to 10 drivers
-        
-      console.log('Filtered drivers:', filteredDrivers);
+      // Count real vs bot drivers for console logging
+      const realDrivers = data.drivers.filter(driver => 
+        !driver.driverId.includes('BOT') && 
+        (driver.status === "Live" || driver.status === "online" || !driver.status)
+      );
+      const botDrivers = data.drivers.filter(driver => 
+        driver.driverId.includes('BOT') || 
+        (driver.status && driver.status !== "Live" && driver.status !== "online")
+      );
+      
+      console.log(`Available real drivers: ${realDrivers.length}, Random bot drivers: ${botDrivers.length}`);
+      
+      // Filter to only show real drivers on the map
+      const filteredDrivers = data.drivers
+        .filter(driver => {
+          // Show only real drivers (not BOT) with proper status
+          if (driver.driverId.includes('BOT')) return false;
+          if (driver.status && driver.status !== "Live" && driver.status !== "online") {
+            return false;
+          }
+          
+          const distance = calculateDistance(
+            location.latitude,
+            location.longitude,
+            driver.location.coordinates[1], // latitude
+            driver.location.coordinates[0]  // longitude
+          );
+          
+          return distance <= 5; // 5km radius
+        })
+        .sort((a, b) => calculateDistance(location.latitude, location.longitude, a.location.coordinates[1], a.location.coordinates[0]) -
+                         calculateDistance(location.latitude, location.longitude, b.location.coordinates[1], b.location.coordinates[0]))
+        .slice(0, 10); // Limit to 10 drivers
+      
+      console.log('Filtered drivers to show on map:', filteredDrivers.length);
       setNearbyDrivers(filteredDrivers);
       setNearbyDriversCount(filteredDrivers.length);
     };
@@ -8835,9 +8849,12 @@ const filteredDrivers = data.drivers
   }, [location]);
 
   // Handle real-time driver location updates
-  useEffect(() => {
+useEffect(() => {
     const handleDriverLiveLocationUpdate = (data: { driverId: string; lat: number; lng: number; status?: string }) => {
       if (!location) return;
+      
+      // Skip bot drivers
+      if (data.driverId.includes('BOT')) return;
       
       setNearbyDrivers((prev) => {
         // Check if driver already exists
@@ -8853,8 +8870,8 @@ const filteredDrivers = data.drivers
           };
           return updated;
         } else {
-          // Only add new driver if status is "Live"
-          if (data.status && data.status !== "Live") return prev;
+          // Only add new driver if status is "Live" or "online"
+          if (data.status && data.status !== "Live" && data.status !== "online") return prev;
           
           // Add new driver
           return [
@@ -8869,12 +8886,6 @@ const filteredDrivers = data.drivers
           ];
         }
       });
-      
-      // Update driver count
-      setNearbyDriversCount(prev => {
-        const count = prev + (existingIndex < 0 ? 1 : 0);
-        return Math.min(10, count);
-      });
     };
     
     socket.on("driverLiveLocationUpdate", handleDriverLiveLocationUpdate);
@@ -8882,7 +8893,7 @@ const filteredDrivers = data.drivers
   }, [location]);
 
   // Handle driver offline events
-  useEffect(() => {
+ useEffect(() => {
     const handleDriverOffline = (data: { driverId: string }) => {
       console.log(`Driver ${data.driverId} went offline`);
       setNearbyDrivers(prev => prev.filter(driver => driver.driverId !== data.driverId));
@@ -8891,6 +8902,38 @@ const filteredDrivers = data.drivers
     
     socket.on("driverOffline", handleDriverOffline);
     return () => socket.off("driverOffline", handleDriverOffline);
+  }, []);
+
+
+
+
+
+
+
+    // Handle driver status updates - NEW: To handle status changes for existing drivers
+  useEffect(() => {
+    const handleDriverStatusUpdate = (data: { driverId: string; status: string }) => {
+      console.log(`Driver ${data.driverId} status updated to: ${data.status}`);
+      
+      // If driver goes offline, remove them
+      if (data.status === "offline") {
+        setNearbyDrivers(prev => prev.filter(driver => driver.driverId !== data.driverId));
+        setNearbyDriversCount(prev => Math.max(0, prev - 1));
+        return;
+      }
+      
+      // Update status for existing drivers
+      setNearbyDrivers(prev => {
+        return prev.map(driver => 
+          driver.driverId === data.driverId 
+            ? { ...driver, status: data.status }
+            : driver
+        );
+      });
+    };
+    
+    socket.on("driverStatusUpdate", handleDriverStatusUpdate);
+    return () => socket.off("driverStatusUpdate", handleDriverStatusUpdate);
   }, []);
 
   // Listen for ride-related updates (unchanged)
@@ -9214,33 +9257,56 @@ const filteredDrivers = data.drivers
     }
   };
 
-  const handleBookRide = async () => {
-    const token = await AsyncStorage.getItem('authToken');
-    if (!token) {
-      Alert.alert('Authentication Error', 'Please log in to book a ride');
-      return;
-    }
-    const userId = await AsyncStorage.getItem('userId') || 'U001';
-    if (!pickupLocation || !dropoffLocation) {
-      Alert.alert("Error", "Please select both pickup and dropoff locations");
-      return;
-    }
-    if (!estimatedPrice) {
-      Alert.alert("Error", "Price calculation failed. Please try again.");
-      return;
-    }
-    const rideId = "RID" + Date.now();
-    setCurrentRideId(rideId);
-    setRideStatus("searching");
-    socket.emit("bookRide", {
-      rideId,
-      userId,
-      pickup: { lat: pickupLocation.latitude, lng: pickupLocation.longitude, address: pickup },
-      drop: { lat: dropoffLocation.latitude, lng: dropoffLocation.longitude, address: dropoff },
-      vehicleType: selectedRideType,
-    });
-    Alert.alert("Searching for driver... 🚖");
-  };
+// Update the handleBookRide function in TaxiContent.tsx
+
+const handleBookRide = async () => {
+  const token = await AsyncStorage.getItem('authToken');
+  if (!token) {
+    Alert.alert('Authentication Error', 'Please log in to book a ride');
+    return;
+  }
+  const userId = await AsyncStorage.getItem('userId') || 'U001';
+  if (!pickupLocation || !dropoffLocation) {
+    Alert.alert("Error", "Please select both pickup and dropoff locations");
+    return;
+  }
+  if (!estimatedPrice) {
+    Alert.alert("Error", "Price calculation failed. Please try again.");
+    return;
+  }
+  
+  // Generate OTP here
+  const otp = Math.floor(1000 + Math.random() * 9000).toString();
+  setBookingOTP(otp);
+  
+  const rideId = "RID" + Date.now();
+  setCurrentRideId(rideId);
+  setRideStatus("searching");
+  
+  // Show the success alert immediately with the OTP
+  Alert.alert(
+    "Ride Booked Successfully! 🎉", 
+    `Your ride has been booked. Your OTP is: ${otp}\nPlease share this OTP with your driver.`,
+    [
+      { 
+        text: "OK", 
+        onPress: () => {
+          // Show the confirmation modal after OK is pressed
+          setShowConfirmModal(true);
+        }
+      }
+    ]
+  );
+  
+  // Still emit the ride request to the backend
+  socket.emit("bookRide", {
+    rideId,
+    userId,
+    pickup: { lat: pickupLocation.latitude, lng: pickupLocation.longitude, address: pickup },
+    drop: { lat: dropoffLocation.latitude, lng: dropoffLocation.longitude, address: dropoff },
+    vehicleType: selectedRideType,
+  });
+};
 
   const handleConfirmBooking = async () => {
     try {
